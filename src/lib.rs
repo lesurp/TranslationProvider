@@ -69,14 +69,27 @@ pub fn generate_translation(input: proc_macro::TokenStream) -> proc_macro::Token
     let mut fn_gen = quote! {};
 
     for (translation_key, translation_arguments) in translation_parse.translation_keys {
-        let method_name = Ident::new(
-            &(translation_key.to_string() + "_"),
+        // generates a unique field which is stored internally in the struct
+        let internal_field_name = Ident::new(
+            &(translation_key.to_string() + "_implementation_name_plz_dont_use_this_name_plz"),
             proc_macro2::Span::call_site(),
         );
-        str_gen = quote! {
-            #str_gen
-            #translation_key: String,
+        let external_name = translation_key.to_string();
+
+        // ... but we still want to ser/deser using the normal name!
+        let serde_rename_field = if cfg!(feature = "serde") {
+            quote! {
+                #[serde(rename = #external_name)]
+            }
+        } else {
+            quote! {}
         };
+
+        str_gen = quote! {
+                    #str_gen
+                    #serde_rename_field
+                    #internal_field_name: String,
+                };
 
         let mut param_decl = quote! { &self, };
         let mut param_call = quote! {};
@@ -95,11 +108,11 @@ pub fn generate_translation(input: proc_macro::TokenStream) -> proc_macro::Token
         fn_gen = quote! {
             #fn_gen
 
-            pub fn #method_name ( #param_decl ) -> Result<String, strfmt::FmtError> {
+            pub fn #translation_key ( #param_decl ) -> Result<String, strfmt::FmtError> {
                 use std::collections::HashMap;
                 let mut params : HashMap<String, String> = HashMap::new();
                 #param_call
-                strfmt::strfmt(&self.#translation_key, &params)
+                strfmt::strfmt(&self.#internal_field_name, &params)
             }
         };
     }
