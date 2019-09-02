@@ -19,8 +19,8 @@ r#"
 fn main() {
     let ts : TranslationProvider = serde_json::from_str(SOME_TRANSLATOR_PROVIDED_DATA).unwrap();
 
-    println!("{}", ts.january().unwrap());
-    println!("{}", ts.february().unwrap());
+    println!("{}", ts.january());
+    println!("{}", ts.february());
     println!("{}", ts.format_money(3, 14).unwrap());
 
     println!("The generated code was:\n{}", TranslationProvider::generated_code());

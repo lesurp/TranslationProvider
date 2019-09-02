@@ -86,33 +86,46 @@ pub fn generate_translation(input: proc_macro::TokenStream) -> proc_macro::Token
         };
 
         str_gen = quote! {
-                    #str_gen
-                    #serde_rename_field
-                    #internal_field_name: String,
-                };
+            #str_gen
+            #serde_rename_field
+            #internal_field_name: String,
+        };
 
         let mut param_decl = quote! { &self, };
         let mut param_call = quote! {};
-        for (id, ty) in translation_arguments.arguments {
-            param_decl = quote! {
-                #param_decl
-                #id: #ty,
-            };
 
-            param_call = quote! {
-                #param_call
-                params.insert(stringify!(#id).to_owned(), #id.to_string());
-            };
-        }
+        // We branch here because returning a Result<T, E> makes no sense if the translation is only a string
+        // and not a formatting
+        fn_gen = if translation_arguments.arguments.is_empty() {
+            quote! {
+                #fn_gen
 
-        fn_gen = quote! {
-            #fn_gen
+                pub fn #translation_key ( #param_decl ) -> String {
+                    use std::collections::HashMap;
+                    self.#internal_field_name.clone()
+                }
+            }
+        } else {
+            for (id, ty) in translation_arguments.arguments {
+                param_decl = quote! {
+                    #param_decl
+                    #id: #ty,
+                };
 
-            pub fn #translation_key ( #param_decl ) -> Result<String, strfmt::FmtError> {
-                use std::collections::HashMap;
-                let mut params : HashMap<String, String> = HashMap::new();
-                #param_call
-                strfmt::strfmt(&self.#internal_field_name, &params)
+                param_call = quote! {
+                    #param_call
+                    params.insert(stringify!(#id).to_owned(), #id.to_string());
+                };
+            }
+            quote! {
+                #fn_gen
+
+                pub fn #translation_key ( #param_decl ) -> Result<String, strfmt::FmtError> {
+                    use std::collections::HashMap;
+                    let mut params : HashMap<String, String> = HashMap::new();
+                    #param_call
+                    strfmt::strfmt(&self.#internal_field_name, &params)
+                }
             }
         };
     }
