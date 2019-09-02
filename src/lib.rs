@@ -112,7 +112,7 @@ pub fn generate_translation(input: proc_macro::TokenStream) -> proc_macro::Token
         quote! {}
     };
 
-    let final_output = quote! {
+    let final_generated_struct = quote! {
         #serde_derive
         pub struct TranslationProvider {
             #str_gen
@@ -120,6 +120,16 @@ pub fn generate_translation(input: proc_macro::TokenStream) -> proc_macro::Token
 
         impl TranslationProvider {
             #fn_gen
+        }
+    };
+
+    let final_output = quote! {
+        #final_generated_struct
+
+        impl TranslationProvider {
+            fn generated_code() -> String {
+                stringify!(#final_generated_struct).to_owned()
+            }
         }
     };
 
