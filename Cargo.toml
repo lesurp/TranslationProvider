@@ -3,6 +3,9 @@ name = "translation_provider"
 version = "0.1.0"
 authors = ["Paul Lesur <git@lesurpaul.fr>"]
 edition = "2018"
+license = "MIT"
+description = "Generates a struct and associated methods to simplify internationalisation!"
+repository = "https://github.com/lesurp/TranslationProvider"
 
 [lib]
 proc-macro = true
