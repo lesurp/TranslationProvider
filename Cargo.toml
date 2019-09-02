@@ -1,0 +1,18 @@
+[package]
+name = "translation_provider"
+version = "0.1.0"
+authors = ["Paul Lesur <git@lesurpaul.fr>"]
+edition = "2018"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+quote = "1.0.2"
+proc-macro2 = "1.0.1"
+syn = { version = "1.0.5", features = ["full"] }
+strfmt = "0.1.6"
+serde = { version = "1.0", features = ["derive"], optional = true }
+
+[features]
+default = ["serde"]
