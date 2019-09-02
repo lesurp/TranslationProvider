@@ -101,7 +101,6 @@ pub fn generate_translation(input: proc_macro::TokenStream) -> proc_macro::Token
                 #fn_gen
 
                 pub fn #translation_key ( #param_decl ) -> String {
-                    use std::collections::HashMap;
                     self.#internal_field_name.clone()
                 }
             }
