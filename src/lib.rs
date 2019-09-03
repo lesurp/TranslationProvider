@@ -4,6 +4,42 @@ use quote::quote;
 use std::collections::HashMap;
 use syn::{Ident, Token, Type};
 
+const STRUCT_MEMBER_SUFFIX: &str = "_IMPLEMENTATION_NAME_PLZ_DONT_USE_THIS_NAME_PLZ";
+const ID_RESERVED_METHOD: &str = "id_ANOTHER_NAME_DONT_USE_EITHER_TY";
+const DISPLAY_RESERVED_METHOD: &str = "display_ANOTHER_NAME_DONT_USE_EITHER_TY";
+
+struct Item(Ident);
+impl syn::parse::Parse for Item {
+    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+        Ok(Item(input.parse::<Ident>()?))
+    }
+}
+
+#[proc_macro]
+pub fn create_provider_index(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let member = syn::parse_macro_input!(input as Item).0;
+
+    let reserved_id_getter_name = Ident::new(
+        &("id".to_owned() + ID_RESERVED_METHOD),
+        proc_macro2::Span::call_site(),
+    );
+    let reserved_display_getter_name = Ident::new(
+        &("display".to_owned() + DISPLAY_RESERVED_METHOD),
+        proc_macro2::Span::call_site(),
+    );
+    let output = quote! {
+        {
+            let mut indexes = Vec::new();
+            for translation_provider in #member {
+               indexes.push((translation_provider.#reserved_id_getter_name(), translation_provider.#reserved_display_getter_name()));
+            }
+            indexes
+        }
+    };
+
+    proc_macro::TokenStream::from(output)
+}
+
 struct TranslationParameters {
     pub arguments: Vec<(Ident, Type)>,
 }
@@ -35,21 +71,36 @@ impl syn::parse::Parse for TranslationParameters {
 
 struct TranslationParse {
     pub translation_keys: HashMap<Ident, TranslationParameters>,
+    pub id: Ident,
+    pub display: Ident,
 }
 
 impl syn::parse::Parse for TranslationParse {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let mut translation_keys = HashMap::new();
+        let mut id = None;
+        let mut display = None;
         while !input.is_empty() {
             let next_translation = input.parse::<syn::Ident>()?;
 
-            if input.peek(Token![,]) || input.is_empty() {
-                translation_keys.insert(next_translation, TranslationParameters::default());
-            } else {
+            let translation_params = if input.peek(syn::token::Paren) {
                 let content;
                 syn::parenthesized!(content in input);
-                translation_keys
-                    .insert(next_translation, content.parse::<TranslationParameters>()?);
+                content.parse::<TranslationParameters>()?
+            } else {
+                TranslationParameters::default()
+            };
+
+            translation_keys.insert(next_translation, translation_params);
+
+            if input.peek(Token![=]) {
+                input.parse::<Token![=]>().unwrap();
+                let tag = input.parse::<syn::Ident>()?;
+                match tag.to_string().as_str() {
+                    "display" => display = Some(tag),
+                    "id" => id = Some(tag),
+                    _ => panic!("Unknown tag for the member - only 'display' and 'id' are supported for now!"),
+                }
             }
 
             if input.peek(Token![,]) {
@@ -57,21 +108,46 @@ impl syn::parse::Parse for TranslationParse {
             }
         }
 
-        Ok(TranslationParse { translation_keys })
+        Ok(TranslationParse {
+            translation_keys,
+            id: id.expect("Id member was not specified!"),
+            display: display.expect("Display member was not specified!"),
+        })
     }
 }
 
 #[proc_macro]
 pub fn generate_translation(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let translation_parse = syn::parse_macro_input!(input as TranslationParse);
+    let id = translation_parse.id;
+    let display = translation_parse.display;
 
+    // generates the struct members
     let mut str_gen = quote! {};
-    let mut fn_gen = quote! {};
+
+    // generates the struc getters/formatters
+    let reserved_id_getter_name = Ident::new(
+        &("id".to_owned() + ID_RESERVED_METHOD),
+        proc_macro2::Span::call_site(),
+    );
+    let reserved_display_getter_name = Ident::new(
+        &("display".to_owned() + DISPLAY_RESERVED_METHOD),
+        proc_macro2::Span::call_site(),
+    );
+    let mut fn_gen = quote! {
+        pub fn #reserved_id_getter_name(&self) -> String {
+            self.#id()
+        }
+
+        pub fn #reserved_display_getter_name(&self) -> String {
+            self.#display()
+        }
+    };
 
     for (translation_key, translation_arguments) in translation_parse.translation_keys {
         // generates a unique field which is stored internally in the struct
         let internal_field_name = Ident::new(
-            &(translation_key.to_string() + "_implementation_name_plz_dont_use_this_name_plz"),
+            &(translation_key.to_string() + STRUCT_MEMBER_SUFFIX),
             proc_macro2::Span::call_site(),
         );
         let external_name = translation_key.to_string();
