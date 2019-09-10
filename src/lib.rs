@@ -100,8 +100,8 @@ pub fn generate_translation(input: proc_macro::TokenStream) -> proc_macro::Token
             quote! {
                 #fn_gen
 
-                pub fn #translation_key ( #param_decl ) -> String {
-                    self.#internal_field_name.clone()
+                pub fn #translation_key ( #param_decl ) -> &str {
+                    &self.#internal_field_name
                 }
             }
         } else {
